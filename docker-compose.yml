@@ -1,0 +1,68 @@
+services:
+  mediadb:
+    build:
+      context: ./db
+      dockerfile: Dockerfile
+    networks:
+      db_network:
+        aliases:
+          - mediadb
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    healthcheck:
+      test: mysql --user=${MYSQL_USER} --password=${MYSQL_PASSWORD} --execute="SHOW DATABASES;"
+      interval: 5s
+    volumes:
+      - ./db/data:/var/lib/mysql-no-volume
+    restart: unless-stopped
+
+  mediaapi:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+      args:
+        GITHUB_USERNAME: ${GITHUB_USERNAME}
+        GITHUB_TOKEN: ${GITHUB_TOKEN}
+        REPO_NAME: ${API_REPO_NAME}
+        BRANCH: ${BRANCH}
+    networks:
+      - db_network
+      - app_network
+    environment:
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+      - SPRING_ALLOWED_ORIGIN=${SPRING_ALLOWED_ORIGIN}
+    depends_on:
+      mediadb:
+        condition: service_healthy
+        restart: true
+    volumes:
+      - ./api/uploads:/app/uploads
+    restart: unless-stopped
+
+  mediaweb:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        GITHUB_USERNAME: ${GITHUB_USERNAME}
+        GITHUB_TOKEN: ${GITHUB_TOKEN}
+        REPO_NAME: ${WEB_REPO_NAME}
+        BRANCH: ${BRANCH}
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_PRIME_LICENSE: ${VITE_PRIME_LICENSE}
+    networks:
+      - app_network
+    depends_on:
+      - mediaapi
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+
+networks:
+  db_network:
+  app_network:
