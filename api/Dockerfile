@@ -32,7 +32,7 @@ RUN git clone \
 WORKDIR /build/app
 
 # Build the application
-RUN mvn clean package -DskipTests
+RUN mvn clean package -DskipTests -P prod
 
 # -------------------------
 # Stage 2: Run the application
